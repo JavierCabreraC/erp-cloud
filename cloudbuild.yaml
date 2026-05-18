@@ -1,0 +1,27 @@
+steps:
+  # 1. Construir la imagen de Docker
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/erp-cloud', '.']
+
+  # 2. Subir la imagen al registro
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/erp-cloud']
+
+  # 3. Desplegar el servicio monolítico en Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'erp-cloud'
+      - '--image=gcr.io/$PROJECT_ID/erp-cloud'
+      - '--region=us-central1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars=DATABASE_URL=${_DATABASE_URL}'
+
+substitutions:
+  _DATABASE_URL: 'REMPLAZAR_EN_EL_TRIGGER_DE_GCP'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
