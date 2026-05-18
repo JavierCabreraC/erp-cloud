@@ -171,3 +171,8 @@ gcloud config set project [PROJECT_ID]
 gcloud run services logs read erp-cloud --region=us-central1
 ```
 O desde la consola: **Cloud Run → erp-cloud → Logs**.
+
+
+
+# Test
+Deploy!
