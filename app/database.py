@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
 from pydantic_settings import BaseSettings
+from sqlalchemy.orm import sessionmaker, declarative_base
 
 class Settings(BaseSettings):
     DATABASE_URL: str

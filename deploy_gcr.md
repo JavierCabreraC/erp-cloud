@@ -78,8 +78,11 @@ Cloud Build necesita permisos para desplegar en Cloud Run.
    | Variable | Valor |
    |---|---|
    | `_DATABASE_URL` | `postgresql://user:password@host/dbname?sslmode=require` |
+   | `_API_KEY` | `reemplazar-con-un-string-secreto-largo` |
 
-   > Reemplazar con el string de conexión real de Neon. Esta variable no se guarda en el repositorio.
+   > Reemplazar con los valores reales. Estas variables no se guardan en el repositorio.
+   >
+   > Para generar un API key seguro: `python -c "import secrets; print(secrets.token_hex(32))"`
 
 4. Hacer clic en **Save**
 
