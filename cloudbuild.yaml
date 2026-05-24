@@ -18,10 +18,11 @@ steps:
       - '--region=us-central1'
       - '--platform=managed'
       - '--allow-unauthenticated'
-      - '--set-env-vars=DATABASE_URL=${_DATABASE_URL}'
+      - '--set-env-vars=DATABASE_URL=${_DATABASE_URL},API_KEY=${_API_KEY}'
 
 substitutions:
   _DATABASE_URL: 'REMPLAZAR_EN_EL_TRIGGER_DE_GCP'
+  _API_KEY: 'REMPLAZAR_EN_EL_TRIGGER_DE_GCP'
 
 options:
   logging: CLOUD_LOGGING_ONLY
