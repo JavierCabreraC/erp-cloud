@@ -1,6 +1,6 @@
 # ERP Minisúper — Documentación del Proyecto
 
-> Sistema backend de gestión para una tienda pequeña, construido con **FastAPI + PostgreSQL (Neon)**, desplegado en **Google Cloud Run**.
+> Sistema backend de gestión para una tienda pequeña, construido con **FastAPI + PostgreSQL (Neon)**, desplegado en **AWS Elastic Beanstalk**.
 
 ---
 
@@ -27,8 +27,8 @@ El proyecto es 100% backend. No incluye interfaz gráfica. Todas las pruebas e i
 | Package manager | UV |
 | ORM | SQLAlchemy 2.0 |
 | Base de datos | PostgreSQL hosteado en Neon |
-| Despliegue | Google Cloud Run |
-| CI/CD | Google Cloud Build (desde GitHub) |
+| Despliegue | AWS Elastic Beanstalk |
+| CI/CD | AWS CodePipeline (desde GitHub) |
 | Pruebas | Postman |
 
 ---
@@ -45,8 +45,8 @@ erp-cloud/
 ├── .python-version                 # Contiene "3.12"
 ├── pyproject.toml                  # Dependencias gestionadas por UV
 ├── uv.lock                         # Lockfile — SÍ subir a git
-├── Dockerfile                      # Imagen para Cloud Run
-├── cloudbuild.yaml                 # Pipeline CI/CD en Google Cloud
+├── Dockerfile                      # Imagen Docker — usada por Elastic Beanstalk
+├── cloudbuild.yaml                 # Pipeline CI/CD legado (Google Cloud — no se usa en producción)
 │
 ├── scripts/
 │   ├── __init__.py
@@ -56,7 +56,7 @@ erp-cloud/
     ├── __init__.py
     ├── main.py                     # Monolito local: instancia FastAPI con todos los routers
     │
-    ├── entrypoints/                # Un FastAPI por módulo — usados para despliegue independiente en Cloud Run
+    ├── entrypoints/                # Un FastAPI por módulo — para despliegue independiente (no activo en producción)
     │   ├── clientes.py
     │   ├── productos.py
     │   ├── inventario.py
@@ -169,7 +169,7 @@ erp-cloud/
 
 ---
 
-## Flujo de Despliegue en Google Cloud
+## Flujo de Despliegue en AWS
 
 ```
 Desarrollo local
@@ -178,22 +178,25 @@ Desarrollo local
       ▼
 GitHub (repositorio remoto)
       │
-      │  Cloud Build detecta el push (via trigger configurado)
+      │  AWS CodePipeline detecta el push automáticamente
       ▼
-Cloud Build ejecuta cloudbuild.yaml
+CodePipeline — Source stage
       │
-      ├─ Paso 1: docker build -t gcr.io/$PROJECT_ID/erp-cloud .
-      ├─ Paso 2: docker push gcr.io/$PROJECT_ID/erp-cloud
-      └─ Paso 3: gcloud run deploy erp-cloud --image ...
-      │
+      │  descarga el código y lo pasa a la siguiente etapa
       ▼
-Google Cloud Run
+CodePipeline — Deploy stage
       │
-      └─ URL pública HTTPS generada automáticamente:
-         https://erp-cloud-xxxxxxxxxx-uc.a.run.app
+      │  envía el código a Elastic Beanstalk
+      ▼
+Elastic Beanstalk
+      │
+      ├─ construye la imagen Docker a partir del Dockerfile
+      ├─ levanta el contenedor en una instancia EC2
+      └─ URL pública HTTP disponible:
+         http://erp-cloud-env.eba-xxxx.us-east-1.elasticbeanstalk.com
 ```
 
-### Archivos clave para el despliegue
+### Archivo clave para el despliegue
 
 **`Dockerfile`**
 ```dockerfile
@@ -205,32 +208,17 @@ COPY ./app ./app
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
 ```
 
-**`cloudbuild.yaml`**
-```yaml
-steps:
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/erp-cloud', '.']
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/erp-cloud']
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    args:
-      - gcloud
-      - run
-      - deploy
-      - erp-cloud
-      - '--image=gcr.io/$PROJECT_ID/erp-cloud'
-      - '--region=us-central1'
-      - '--platform=managed'
-      - '--allow-unauthenticated'
-```
+### Variables de entorno en Elastic Beanstalk
 
-### Variables de entorno en Cloud Run
+Se configuran desde la consola de AWS: entorno `erp-cloud-env` → **Configuration** → **Software** → **Environment properties**.
 
-```bash
-gcloud run services update erp-cloud \
-  --region=us-central1 \
-  --set-env-vars DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
-```
+| Variable | Descripción |
+|---|---|
+| `PORT` | `8080` |
+| `DATABASE_URL` | Connection string de Neon |
+| `API_KEY` | Clave secreta para autenticar requests |
+
+Para más detalles ver [`deploy_aws.md`](deploy_aws.md).
 
 ---
 
@@ -244,10 +232,12 @@ gcloud run services update erp-cloud \
 
 | Variable | Env: Local | Env: Cloud |
 |---|---|---|
-| `BASE_URL` | `http://localhost:8000` | `https://erp-cloud-xxxx-uc.a.run.app` |
+| `BASE_URL` | `http://localhost:8000` | `http://erp-cloud-env.eba-xxxx.us-east-1.elasticbeanstalk.com` |
+| `API_KEY` | el valor de tu `.env` local | el mismo valor configurado en Beanstalk |
 
-4. En cada request usar `{{BASE_URL}}/clientes`, `{{BASE_URL}}/ventas`, etc.
-5. Cambiar de environment con un solo clic para alternar entre local y producción.
+4. En cada request que requiera autenticación, agregá el header `X-API-Key: {{API_KEY}}`.
+5. Usar `{{BASE_URL}}/clientes`, `{{BASE_URL}}/ventas`, etc. en las URLs de cada request.
+6. Cambiar de environment con un solo clic para alternar entre local y producción.
 
 ### Orden recomendado para pruebas
 
